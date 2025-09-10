@@ -7,23 +7,7 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header>
-        <nav class="nav">
-            <div class="nav-logo">
-                <img src="logopns.png" alt="Logo" class="logo">
-            </div>
-            <ul class="nav-links">
-                <li><a href="#Homepage">Homepage</a></li>
-                <li><a href="#Iteneraries">Iteneraries</a></li>
-                <li><a href="#About us">About us</a></li>
-            </ul>
-            <div class="burger-menu" onclick="window.toggleSidePanel('open')">
-                <span class="burger-line"></span>
-                <span class="burger-line"></span>
-                <span class="burger-line"></span>
-            </div>
-        </nav>
-    </header>
+    <header-component></header-component>
     
     <div class="side-panel-overlay"></div>
     <div class="side-panel">
@@ -61,6 +45,7 @@
 
     <footer-component></footer-component>
     
+    <script src="header/header.js"></script>
     <script src="footer/footer.js"></script>
     <script src="toggle.js"></script>
     <script src="script.js"></script>

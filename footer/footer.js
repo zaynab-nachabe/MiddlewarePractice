@@ -9,7 +9,6 @@ class FooterComponent extends HTMLElement {
     }
 
     render() {
-        // Load the template
         const template = document.createElement('template');
         template.innerHTML = `
             <style>
@@ -39,10 +38,8 @@ class FooterComponent extends HTMLElement {
             </div>
         `;
         
-        // Append the template content to the shadow DOM
         this.shadowRoot.appendChild(template.content.cloneNode(true));
     }
 }
 
-// Define the custom element
 customElements.define('footer-component', FooterComponent);
