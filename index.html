@@ -17,7 +17,7 @@
                 <li><a href="#Iteneraries">Iteneraries</a></li>
                 <li><a href="#About us">About us</a></li>
             </ul>
-            <div class="burger-menu">
+            <div class="burger-menu" onclick="window.toggleSidePanel('open')">
                 <span class="burger-line"></span>
                 <span class="burger-line"></span>
                 <span class="burger-line"></span>
@@ -27,7 +27,7 @@
     
     <div class="side-panel-overlay"></div>
     <div class="side-panel">
-        <div class="burger-menu side-panel-burger">
+        <div class="burger-menu side-panel-burger" onclick="window.toggleSidePanel('close')">
             <span class="burger-line"></span>
             <span class="burger-line"></span>
             <span class="burger-line"></span>
@@ -59,9 +59,10 @@
         <p>Du blabla est dans du blabla mais ça ne veut pas dire que le blabla n'est pas un plouf. C'est trop plouf de penser que c'est blabla. De toute façon le blabla a du blabla dedans et le ploof a beaucoup de ploof dehors.</p>
     </main>
 
-    <footer class="footer">
-        <p>Benjamin Vella pour Polytech Nice-Sophia - 2024</p>
-    </footer>
+    <footer-component></footer-component>
+    
+    <script src="footer/footer.js"></script>
+    <script src="toggle.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

@@ -5,43 +5,29 @@ document.addEventListener('DOMContentLoaded', function() {
     const sidePanelOverlay = document.querySelector('.side-panel-overlay');
     const sidePanelLinks = document.querySelectorAll('.side-panel-links a');
     
+    // Initialize panel state
+    let sidePanelOpen = false;
+    
     if (burgerMenu && sidePanel && sidePanelOverlay) {
-        burgerMenu.addEventListener('click', function() {
-            const isActive = sidePanel.classList.contains('open');
-            
-            if (isActive) {
-                closeSidePanel();
-            } else {
-                openSidePanel();
-            }
-        });
+        // Ensure panels have correct initial state
+        sidePanel.classList.remove('open');
+        sidePanelOverlay.classList.remove('show');
+        sidePanel.style.display = 'none';
+        sidePanelOverlay.style.display = 'none';
         
-        if (sidePanelBurger) {
-            sidePanelBurger.addEventListener('click', function() {
-                closeSidePanel();
-            });
-        }
+        // The main burger menu now uses the onclick attribute
+        // so we don't need this event listener anymore
         
+        // Handle overlay clicks to close panel
         sidePanelOverlay.addEventListener('click', function() {
-            closeSidePanel();
+            window.toggleSidePanel('close');
         });
         
+        // Handle navigation link clicks to close panel
         sidePanelLinks.forEach(link => {
             link.addEventListener('click', function() {
-                closeSidePanel();
+                window.toggleSidePanel('close');
             });
         });
-        
-        function openSidePanel() {
-            sidePanel.classList.add('open');
-            sidePanelOverlay.classList.add('show');
-            document.body.style.overflow = 'hidden';
-        }
-        
-        function closeSidePanel() {
-            sidePanel.classList.remove('open');
-            sidePanelOverlay.classList.remove('show');
-            document.body.style.overflow = '';
-        }
     }
 });
