@@ -19,9 +19,9 @@
         <div class="side-panel-content">
             <h3>Pages</h3>
             <ul class="side-panel-links">
-                <li><a href="#Homepage">Homepage</a></li>
-                <li><a href="#Iteneraries">Iteneraries</a></li>
-                <li><a href="#About us">About us</a></li>
+                <li><a href="index.html">Homepage</a></li>
+                <li><a href="iteneraries.html">Itineraries</a></li>
+                <li><a href="aboutUs.html">About us</a></li>
             </ul>
             <h3>Chapitre</h3>
             <ul>
@@ -41,12 +41,33 @@
     <main>
         <h1>Introduction</h1>
         <p>Du blabla est dans du blabla mais ça ne veut pas dire que le blabla n'est pas un plouf. C'est trop plouf de penser que c'est blabla. De toute façon le blabla a du blabla dedans et le ploof a beaucoup de ploof dehors.</p>
+        
+        <h2>Select your itenerary</h2>
+        <input-box 
+            label="Departure address" 
+            placeholder="Enter your departure city" 
+            name="departure-address">
+        </input-box>
+        
+        <input-box 
+            label="Destination address" 
+            placeholder="Enter your destination city" 
+            name="destination-address">
+        </input-box>
+        
+        <button-component 
+            text="Search Routes" 
+            type="primary" 
+            size="medium">
+        </button-component>
     </main>
 
     <footer-component></footer-component>
     
     <script src="header/header.js"></script>
     <script src="footer/footer.js"></script>
+    <script src="inputBox/inputBox.js"></script>
+    <script src="buttonComponent/buttonComponent.js"></script>
     <script src="toggle.js"></script>
     <script src="script.js"></script>
 </body>

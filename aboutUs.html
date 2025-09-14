@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About Us - HarmoWeb</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header-component></header-component>
+    
+    <div class="side-panel-overlay"></div>
+    <div class="side-panel">
+        <div class="burger-menu side-panel-burger" onclick="window.toggleSidePanel('close')">
+            <span class="burger-line"></span>
+            <span class="burger-line"></span>
+            <span class="burger-line"></span>
+        </div>
+        <div class="side-panel-content">
+            <h3>Pages</h3>
+            <ul class="side-panel-links">
+                <li><a href="index.html">Homepage</a></li>
+                <li><a href="iteneraries.html">Itineraries</a></li>
+                <li><a href="aboutUs.html">About us</a></li>
+            </ul>
+            <h3>Chapitre</h3>
+            <ul>
+                <li><a href="#our-mission">Our Mission</a></li>
+                <li><a href="#our-team">Our Team</a></li>
+                <li><a href="#contact-us">Contact Us</a></li>
+            </ul>
+        </div>
+    </div>
+    
+    <aside>
+        <h2>About Us</h2>
+        <ul>
+            <li><a href="#our-mission">Our Mission</a></li>
+            <li><a href="#our-team">Our Team</a></li>
+            <li><a href="#contact-us">Contact Us</a></li>
+        </ul>
+    </aside>
+    <main>
+        <h1>About Us</h1>
+        <p>Welcome to HarmoWeb - your destination for seamless travel planning and route optimization.</p>
+        
+        <section id="our-mission">
+            <h2>Our Mission</h2>
+            <p>At HarmoWeb, we strive to create the most intuitive and efficient travel planning platform. Our goal is to help people discover the best routes while minimizing environmental impact and travel time.</p>
+        </section>
+        
+        <section id="our-team">
+            <h2>Our Team</h2>
+            <p>We are a dedicated team of developers, designers, and travel enthusiasts committed to creating the best travel experience for our users.</p>
+            
+            <div class="team-member">
+                <h3>Zaynab Nachabe</h3>
+                <p>Founder & Lead Developer</p>
+                <p>Polytech Nice-Sophia</p>
+            </div>
+        </section>
+        
+        <section id="contact-us">
+            <h2>Contact Us</h2>
+            <p>Have questions or suggestions? We'd love to hear from you!</p>
+            
+            <input-box 
+                label="Your Name" 
+                placeholder="Enter your name" 
+                name="contact-name">
+            </input-box>
+            
+            <input-box 
+                label="Your Email" 
+                placeholder="Enter your email address" 
+                name="contact-email">
+            </input-box>
+            
+            <input-box 
+                label="Subject" 
+                placeholder="Enter message subject" 
+                name="contact-subject">
+            </input-box>
+            
+            <input-box 
+                label="Message" 
+                placeholder="Type your message here" 
+                name="contact-message">
+            </input-box>
+            
+            <button-component 
+                text="Send Message" 
+                type="primary" 
+                size="medium">
+            </button-component>
+        </section>
+    </main>
+
+    <footer-component></footer-component>
+    
+    <script src="header/header.js"></script>
+    <script src="footer/footer.js"></script>
+    <script src="inputBox/inputBox.js"></script>
+    <script src="buttonComponent/buttonComponent.js"></script>
+    <script src="toggle.js"></script>
+    <script src="aboutUs.js"></script>
+</body>
+</html>

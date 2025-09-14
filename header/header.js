@@ -108,9 +108,9 @@ class HeaderComponent extends HTMLElement {
                     <img src="logopns.png" alt="Logo" class="logo">
                 </div>
                 <ul class="nav-links">
-                    <li><a href="#Homepage">Homepage</a></li>
-                    <li><a href="#Iteneraries">Iteneraries</a></li>
-                    <li><a href="#About us">About us</a></li>
+                    <li><a href="index.html">Homepage</a></li>
+                    <li><a href="iteneraries.html">Itineraries</a></li>
+                    <li><a href="aboutUs.html">About us</a></li>
                 </ul>
                 <div class="burger-menu" id="burger-menu">
                     <span class="burger-line"></span>

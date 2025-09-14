@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Itineraries - HarmoWeb</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header-component></header-component>
+    
+    <div class="side-panel-overlay"></div>
+    <div class="side-panel">
+        <div class="burger-menu side-panel-burger" onclick="window.toggleSidePanel('close')">
+            <span class="burger-line"></span>
+            <span class="burger-line"></span>
+            <span class="burger-line"></span>
+        </div>
+        <div class="side-panel-content">
+            <h3>Pages</h3>
+            <ul class="side-panel-links">
+                <li><a href="index.html">Homepage</a></li>
+                <li><a href="iteneraries.html">Itineraries</a></li>
+                <li><a href="aboutUs.html">About us</a></li>
+            </ul>
+            <h3>Chapitre</h3>
+            <ul>
+                <li><a href="#route-planning">Route Planning</a></li>
+                <li><a href="#popular-routes">Popular Routes</a></li>
+            </ul>
+        </div>
+    </div>
+    
+    <aside>
+        <h2>Itineraries</h2>
+        <ul>
+            <li><a href="#route-planning">Route Planning</a></li>
+            <li><a href="#popular-routes">Popular Routes</a></li>
+        </ul>
+    </aside>
+    <main>
+        <h1>Itineraries</h1>
+        <p>Plan your journey with our intuitive route planning tools. Find the best paths between locations with various transportation options.</p>
+        
+        <section id="route-planning">
+            <h2>Route Planning</h2>
+            <p>Use our advanced route planning system to find the optimal path for your journey.</p>
+            
+            <input-box 
+                label="Departure address" 
+                placeholder="Enter your departure city" 
+                name="departure-address">
+            </input-box>
+            
+            <input-box 
+                label="Destination address" 
+                placeholder="Enter your destination city" 
+                name="destination-address">
+            </input-box>
+            
+            <input-box 
+                label="Travel date" 
+                placeholder="Enter your travel date" 
+                name="travel-date">
+            </input-box>
+            
+            <button-component 
+                text="Find Routes" 
+                type="primary" 
+                size="medium">
+            </button-component>
+        </section>
+        
+        <section id="popular-routes">
+            <h2>Popular Routes</h2>
+            <p>Discover some of our most popular routes chosen by frequent travelers:</p>
+            <ul>
+                <li>Paris to Nice</li>
+                <li>Lyon to Marseille</li>
+                <li>Bordeaux to Toulouse</li>
+                <li>Strasbourg to Paris</li>
+            </ul>
+        </section>
+    </main>
+
+    <footer-component></footer-component>
+    
+    <script src="header/header.js"></script>
+    <script src="footer/footer.js"></script>
+    <script src="inputBox/inputBox.js"></script>
+    <script src="buttonComponent/buttonComponent.js"></script>
+    <script src="toggle.js"></script>
+    <script src="iteneraries.js"></script>
+</body>
+</html>
