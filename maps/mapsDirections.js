@@ -1,0 +1,870 @@
+// Maps and Directions functionality for the Itineraries page using OpenStreetMap and Leaflet
+
+let map;
+let routingControl;
+let originMarker;
+let destinationMarker;
+let originLocation;
+let destinationLocation;
+let isDarkMode = false; // Track current map theme
+
+// Initialize the map
+function initMap() {
+    try {
+        // Get the map container element
+        const mapContainer = document.getElementById('map');
+        
+        // Show loading indicator
+        if (mapContainer) {
+            mapContainer.classList.add('loading');
+            mapContainer.innerHTML = `
+                <div class="map-loading-spinner">
+                    <div class="spinner"></div>
+                    <p>Loading map...</p>
+                </div>
+            `;
+        }
+        
+        // Default center on Paris, France
+        const defaultCenter = [48.8566, 2.3522];
+        
+        // Create Leaflet map
+        map = L.map('map').setView(defaultCenter, 7);
+        
+        // Clear the loading indicator
+        mapContainer.innerHTML = '';
+        mapContainer.classList.remove('loading');
+        
+        // Add the default OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(map);
+        
+        // Create the theme toggle control
+        createThemeToggleControl();
+        
+        // Try to get saved addresses from localStorage
+        loadSavedAddresses();
+    } catch (error) {
+        console.error('Error initializing map:', error);
+        
+        // Show a message to the user
+        const mapContainer = document.getElementById('map');
+        if (mapContainer) {
+            mapContainer.innerHTML = `
+                <div style="padding: 20px; text-align: center; color: #e95273;">
+                    <h3>Map could not be loaded</h3>
+                    <p>Please check your internet connection.</p>
+                </div>
+            `;
+        }
+    }
+}
+
+// Function to create a custom control for toggling themes
+function createThemeToggleControl() {
+    // Create a custom Leaflet control
+    const ThemeControl = L.Control.extend({
+        options: {
+            position: 'topright'
+        },
+
+        onAdd: function() {
+            const container = L.DomUtil.create('div', 'theme-control');
+            container.innerHTML = isDarkMode ? 'Light Mode' : 'Dark Mode';
+            container.title = 'Toggle map theme';
+            
+            L.DomEvent.on(container, 'click', function() {
+                toggleMapTheme();
+            });
+            
+            return container;
+        }
+    });
+    
+    // Add the control to the map
+    new ThemeControl().addTo(map);
+}
+
+// Function to toggle the map theme
+function toggleMapTheme() {
+    isDarkMode = !isDarkMode;
+    
+    // Update the theme control button text
+    const themeControl = document.querySelector('.theme-control');
+    if (themeControl) {
+        themeControl.innerHTML = isDarkMode ? 'Light Mode' : 'Dark Mode';
+    }
+    
+    // Remove current tile layer
+    map.eachLayer(function(layer) {
+        if (layer instanceof L.TileLayer) {
+            map.removeLayer(layer);
+        }
+    });
+    
+    // Add the appropriate tile layer based on theme
+    if (isDarkMode) {
+        // Dark theme - use CartoDB Dark Matter
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="https://carto.com/attribution">CARTO</a>',
+            maxZoom: 19
+        }).addTo(map);
+    } else {
+        // Light theme - use default OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(map);
+    }
+    
+    // Update any existing routes
+    if (routingControl) {
+        routingControl.getRouter().options.lineOptions.styles[0].color = isDarkMode ? '#64B5F6' : '#4768cb';
+        routingControl.route();
+    }
+}
+
+// Function to load saved addresses from localStorage
+function loadSavedAddresses() {
+    try {
+        const savedAddresses = JSON.parse(localStorage.getItem('selectedAddresses'));
+        if (savedAddresses && savedAddresses.departure && savedAddresses.destination) {
+            // We have both addresses, try to geocode them
+            console.log('Loading saved addresses for map:', savedAddresses);
+            
+            // Get the origin address
+            if (savedAddresses.departure.coordinates) {
+                // We already have coordinates
+                originLocation = [
+                    savedAddresses.departure.coordinates[1], // lat
+                    savedAddresses.departure.coordinates[0]  // lng
+                ];
+                updateMapWithLocations();
+            } else {
+                // Need to geocode the address
+                geocodeAddress(savedAddresses.departure.address, true);
+            }
+            
+            // Get the destination address
+            if (savedAddresses.destination.coordinates) {
+                // We already have coordinates
+                destinationLocation = [
+                    savedAddresses.destination.coordinates[1], // lat
+                    savedAddresses.destination.coordinates[0]  // lng
+                ];
+                updateMapWithLocations();
+            } else {
+                // Need to geocode the address
+                geocodeAddress(savedAddresses.destination.address, false);
+            }
+        } else {
+            console.log('No saved addresses found for map');
+        }
+    } catch (error) {
+        console.error('Error loading saved addresses for map:', error);
+    }
+}
+
+function createCustomIcon(className) {
+    return L.divIcon({
+        className: 'custom-marker',
+        html: `<div class="${className}"></div>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 15]
+    });
+}
+
+function updateDirectionsSteps(route) {
+    if (!route || !route.instructions || route.instructions.length === 0) {
+        return;
+    }
+    
+    const instructions = route.instructions;
+    const stepsContainer = document.querySelector('.directions-steps');
+    
+    if (!stepsContainer) return;
+    
+    // Clear existing steps except for the first and last ones
+    const allSteps = stepsContainer.querySelectorAll('.direction-step');
+    for (let i = 1; i < allSteps.length - 1; i++) {
+        stepsContainer.removeChild(allSteps[i]);
+    }
+    
+    // Update stats
+    const distanceElement = document.querySelector('.stat-value:first-child');
+    const timeElement = document.querySelector('.stat-value:last-child');
+    
+    if (distanceElement) {
+        distanceElement.textContent = (route.summary.totalDistance / 1000).toFixed(1) + ' km';
+    }
+    
+    if (timeElement) {
+        const hours = Math.floor(route.summary.totalTime / 3600);
+        const minutes = Math.round((route.summary.totalTime % 3600) / 60);
+        timeElement.textContent = hours > 0 ? 
+            `${hours}h ${minutes}min` : 
+            `${minutes} min`;
+    }
+    
+    // Get the last step element (destination)
+    const lastStep = stepsContainer.querySelector('.direction-step:last-child');
+    
+    // Add new steps before the last one
+    instructions.forEach((instruction, index) => {
+        // Skip the first and last instruction (they're handled by the origin/destination)
+        if (index === 0 || index === instructions.length - 1) return;
+        
+        const stepElement = document.createElement('div');
+        stepElement.className = 'direction-step';
+        
+        const stepNumber = document.createElement('div');
+        stepNumber.className = 'step-number';
+        stepNumber.textContent = index + 1; // +1 because we already have the first step
+        
+        const stepContent = document.createElement('div');
+        stepContent.className = 'step-content';
+        
+        const stepText = document.createElement('p');
+        
+        // Clean up the instruction text (remove HTML tags)
+        let cleanText = instruction.text.replace(/<(?:.|\n)*?>/gm, '');
+        
+        stepText.textContent = cleanText;
+        if (instruction.distance > 0) {
+            const distanceSpan = document.createElement('span');
+            distanceSpan.className = 'step-distance';
+            distanceSpan.textContent = ` (${(instruction.distance / 1000).toFixed(1)} km)`;
+            stepText.appendChild(distanceSpan);
+        }
+        
+        stepContent.appendChild(stepText);
+        stepElement.appendChild(stepNumber);
+        stepElement.appendChild(stepContent);
+        
+        // Insert the new step before the last one
+        stepsContainer.insertBefore(stepElement, lastStep);
+    });
+    
+    // Update the last step number
+    const lastStepNumber = lastStep.querySelector('.step-number');
+    if (lastStepNumber) {
+        lastStepNumber.textContent = instructions.length;
+    }
+}
+
+// Initialize the map when the window loads
+window.addEventListener('load', function() {
+    initMap();
+});
+
+// Listen for tab changes to resize the map
+document.addEventListener('DOMContentLoaded', function() {
+    const tabsComponent = document.querySelector('tabs-component');
+    if (tabsComponent) {
+        tabsComponent.addEventListener('tab-changed', function(e) {
+            if (e.detail.title === 'Map View' && map) {
+                // Trigger a resize event to fix any display issues
+                map.invalidateSize();
+                
+                // Recenter the map
+                if (originLocation) {
+                    map.setView(originLocation, 13);
+                }
+            }
+        });
+    }
+});
+
+function geocodeAddress(address, isOrigin) {
+    // Use OpenStreetMap's Nominatim service for geocoding
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`)
+        .then(response => response.json())
+        .then(data => {
+            if (data && data.length > 0) {
+                // Get the location from the first result
+                const location = data[0];
+                
+                if (isOrigin) {
+                    originLocation = [
+                        parseFloat(location.lat),
+                        parseFloat(location.lon)
+                    ];
+                } else {
+                    destinationLocation = [
+                        parseFloat(location.lat),
+                        parseFloat(location.lon)
+                    ];
+                }
+                
+                // Update the map with the new locations
+                updateMapWithLocations();
+            } else {
+                console.error('Geocoding was not successful: No results found');
+            }
+        })
+        .catch(error => {
+            console.error('Error in geocoding:', error);
+        });
+}
+
+function updateMapWithLocations() {
+    try {
+        // Only proceed if we have both locations
+        if (!originLocation || !destinationLocation) {
+            // If we have at least the origin, center the map on it
+            if (originLocation) {
+                map.setView(originLocation, 13);
+                
+                // Create a marker for the origin
+                if (!originMarker) {
+                    originMarker = L.marker(originLocation, {
+                        icon: createCustomIcon('marker-origin')
+                    }).addTo(map);
+                    
+                    // Add a popup with information
+                    originMarker.bindPopup(`
+                        <div class="popup-title">Origin</div>
+                        <div class="popup-address">${document.getElementById('origin-display').textContent}</div>
+                        <div class="popup-info">Start point</div>
+                    `);
+                    
+                    // Add animation class for dropping effect
+                    const markerElement = originMarker.getElement();
+                    if (markerElement) {
+                        markerElement.classList.add('marker-drop');
+                    }
+                } else {
+                    originMarker.setLatLng(originLocation);
+                    
+                    // Apply pulse animation to existing marker
+                    const markerElement = originMarker.getElement();
+                    if (markerElement) {
+                        markerElement.classList.remove('marker-pulse');
+                        void markerElement.offsetWidth; // Trigger reflow
+                        markerElement.classList.add('marker-pulse');
+                    }
+                }
+            }
+            
+            // If we have at least the destination, add a marker
+            if (destinationLocation) {
+                if (!destinationMarker) {
+                    destinationMarker = L.marker(destinationLocation, {
+                        icon: createCustomIcon('marker-destination')
+                    }).addTo(map);
+                    
+                    // Add a popup with information
+                    destinationMarker.bindPopup(`
+                        <div class="popup-title">Destination</div>
+                        <div class="popup-address">${document.getElementById('destination-display').textContent}</div>
+                    `);
+                    
+                    // Add animation class for dropping effect
+                    const markerElement = destinationMarker.getElement();
+                    if (markerElement) {
+                        markerElement.classList.add('marker-drop');
+                    }
+                } else {
+                    destinationMarker.setLatLng(destinationLocation);
+                    
+                    // Apply pulse animation to existing marker
+                    const markerElement = destinationMarker.getElement();
+                    if (markerElement) {
+                        markerElement.classList.remove('marker-pulse');
+                        void markerElement.offsetWidth; // Trigger reflow
+                        markerElement.classList.add('marker-pulse');
+                    }
+                }
+            }
+            
+            return;
+        }
+        
+        // We have both locations, calculate the route
+        if (routingControl) {
+            // Remove the existing route
+            map.removeControl(routingControl);
+        }
+        
+        // Create a new routing control
+        routingControl = L.Routing.control({
+            waypoints: [
+                L.latLng(originLocation[0], originLocation[1]),
+                L.latLng(destinationLocation[0], destinationLocation[1])
+            ],
+            routeWhileDragging: true,
+            lineOptions: {
+                styles: [
+                    { color: isDarkMode ? '#64B5F6' : '#4768cb', opacity: 0.8, weight: 5 }
+                ]
+            },
+            createMarker: function() {
+                // Return null to suppress the default markers, we'll use our own
+                return null;
+            },
+            addWaypoints: false,
+            draggableWaypoints: false,
+            fitSelectedRoutes: true,
+            showAlternatives: false
+        }).addTo(map);
+        
+        // Add our custom markers
+        if (!originMarker) {
+            originMarker = L.marker(originLocation, {
+                icon: createCustomIcon('marker-origin')
+            }).addTo(map);
+            
+            // Add a popup with information
+            originMarker.bindPopup(`
+                <div class="popup-title">Origin</div>
+                <div class="popup-address">${document.getElementById('origin-display').textContent}</div>
+                <div class="popup-info">Start point</div>
+            `);
+            
+            // Add animation class for dropping effect
+            const markerElement = originMarker.getElement();
+            if (markerElement) {
+                markerElement.classList.add('marker-drop');
+            }
+        } else {
+            originMarker.setLatLng(originLocation);
+            
+            // Apply pulse animation to existing marker
+            const markerElement = originMarker.getElement();
+            if (markerElement) {
+                markerElement.classList.remove('marker-pulse');
+                void markerElement.offsetWidth; // Trigger reflow
+                markerElement.classList.add('marker-pulse');
+            }
+        }
+        
+        if (!destinationMarker) {
+            destinationMarker = L.marker(destinationLocation, {
+                icon: createCustomIcon('marker-destination')
+            }).addTo(map);
+            
+            // Listen for the route calculation to update the popup with distance info
+            routingControl.on('routesfound', function(e) {
+                const routes = e.routes;
+                const summary = routes[0].summary;
+                
+                // Update the popup with route information
+                destinationMarker.bindPopup(`
+                    <div class="popup-title">Destination</div>
+                    <div class="popup-address">${document.getElementById('destination-display').textContent}</div>
+                    <div class="popup-info">
+                        <span class="popup-distance">${(summary.totalDistance / 1000).toFixed(1)} km</span> &middot;
+                        <span class="popup-duration">${Math.round(summary.totalTime / 60)} min</span>
+                    </div>
+                `);
+                
+                // Update directions steps
+                updateDirectionsSteps(routes[0]);
+            });
+            
+            // Add animation class for dropping effect
+            const markerElement = destinationMarker.getElement();
+            if (markerElement) {
+                markerElement.classList.add('marker-drop');
+            }
+        } else {
+            destinationMarker.setLatLng(destinationLocation);
+            
+            // Apply pulse animation to existing marker
+            const markerElement = destinationMarker.getElement();
+            if (markerElement) {
+                markerElement.classList.remove('marker-pulse');
+                void markerElement.offsetWidth; // Trigger reflow
+                markerElement.classList.add('marker-pulse');
+            }
+            
+            // Update popup when route changes
+            routingControl.on('routesfound', function(e) {
+                const routes = e.routes;
+                const summary = routes[0].summary;
+                
+                // Update the popup with new route information
+                destinationMarker.bindPopup(`
+                    <div class="popup-title">Destination</div>
+                    <div class="popup-address">${document.getElementById('destination-display').textContent}</div>
+                    <div class="popup-info">
+                        <span class="popup-distance">${(summary.totalDistance / 1000).toFixed(1)} km</span> &middot;
+                        <span class="popup-duration">${Math.round(summary.totalTime / 60)} min</span>
+                    </div>
+                `);
+                
+                // Update directions steps
+                updateDirectionsSteps(routes[0]);
+            });
+        }
+    } catch (error) {
+        console.error('Error updating map locations:', error);
+    }
+}
+
+// Listen for tab changes to resize the map
+document.addEventListener('DOMContentLoaded', function() {
+    const tabsComponent = document.querySelector('tabs-component');
+    if (tabsComponent) {
+        tabsComponent.addEventListener('tab-changed', function(e) {
+            if (e.detail.title === 'Map View' && map) {
+                // Trigger a resize event to fix any display issues
+                map.invalidateSize();
+                
+                // Recenter the map
+                if (originLocation) {
+                    map.setView(originLocation, 13);
+                }
+            }
+        });
+    }
+});
+
+// Function to load saved addresses from localStorage
+function loadSavedAddresses() {
+    try {
+        const savedAddresses = JSON.parse(localStorage.getItem('selectedAddresses'));
+        if (savedAddresses && savedAddresses.departure && savedAddresses.destination) {
+            // We have both addresses, try to geocode them
+            console.log('Loading saved addresses for map:', savedAddresses);
+            
+            // Get the origin address
+            if (savedAddresses.departure.coordinates) {
+                // We already have coordinates
+                originLocation = [
+                    savedAddresses.departure.coordinates[1], // lat
+                    savedAddresses.departure.coordinates[0]  // lng
+                ];
+                updateMapWithLocations();
+            } else {
+                // Need to geocode the address
+                geocodeAddress(savedAddresses.departure.address, true);
+            }
+            
+            // Get the destination address
+            if (savedAddresses.destination.coordinates) {
+                // We already have coordinates
+                destinationLocation = [
+                    savedAddresses.destination.coordinates[1], // lat
+                    savedAddresses.destination.coordinates[0]  // lng
+                ];
+                updateMapWithLocations();
+            } else {
+                // Need to geocode the address
+                geocodeAddress(savedAddresses.destination.address, false);
+            }
+        } else {
+            console.log('No saved addresses found for map');
+        }
+    } catch (error) {
+        console.error('Error loading saved addresses for map:', error);
+    }
+}
+
+function geocodeAddress(address, isOrigin) {
+    // Use OpenStreetMap's Nominatim service for geocoding
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`)
+        .then(response => response.json())
+        .then(data => {
+            if (data && data.length > 0) {
+                // Get the location from the first result
+                const location = data[0];
+                
+                if (isOrigin) {
+                    originLocation = [
+                        parseFloat(location.lat),
+                        parseFloat(location.lon)
+                    ];
+                } else {
+                    destinationLocation = [
+                        parseFloat(location.lat),
+                        parseFloat(location.lon)
+                    ];
+                }
+                
+                // Update the map with the new locations
+                updateMapWithLocations();
+            } else {
+                console.error('Geocoding was not successful: No results found');
+            }
+        })
+        .catch(error => {
+            console.error('Error in geocoding:', error);
+        });
+}
+
+function updateMapWithLocations() {
+    try {
+        // Only proceed if we have both locations
+        if (!originLocation || !destinationLocation) {
+            // If we have at least the origin, center the map on it
+            if (originLocation) {
+                map.setView(originLocation, 13);
+                
+                // Create a marker for the origin
+                if (!originMarker) {
+                    originMarker = L.marker(originLocation, {
+                        icon: createCustomIcon('marker-origin')
+                    }).addTo(map);
+                    
+                    // Add a popup with information
+                    originMarker.bindPopup(`
+                        <div class="popup-title">Origin</div>
+                        <div class="popup-address">${document.getElementById('origin-display').textContent}</div>
+                        <div class="popup-info">Start point</div>
+                    `);
+                    
+                    // Add animation class for dropping effect
+                    const markerElement = originMarker.getElement();
+                    if (markerElement) {
+                        markerElement.classList.add('marker-drop');
+                    }
+                } else {
+                    originMarker.setLatLng(originLocation);
+                    
+                    // Apply pulse animation to existing marker
+                    const markerElement = originMarker.getElement();
+                    if (markerElement) {
+                        markerElement.classList.remove('marker-pulse');
+                        void markerElement.offsetWidth; // Trigger reflow
+                        markerElement.classList.add('marker-pulse');
+                    }
+                }
+            }
+            
+            // If we have at least the destination, add a marker
+            if (destinationLocation) {
+                if (!destinationMarker) {
+                    destinationMarker = L.marker(destinationLocation, {
+                        icon: createCustomIcon('marker-destination')
+                    }).addTo(map);
+                    
+                    // Add a popup with information
+                    destinationMarker.bindPopup(`
+                        <div class="popup-title">Destination</div>
+                        <div class="popup-address">${document.getElementById('destination-display').textContent}</div>
+                    `);
+                    
+                    // Add animation class for dropping effect
+                    const markerElement = destinationMarker.getElement();
+                    if (markerElement) {
+                        markerElement.classList.add('marker-drop');
+                    }
+                } else {
+                    destinationMarker.setLatLng(destinationLocation);
+                    
+                    // Apply pulse animation to existing marker
+                    const markerElement = destinationMarker.getElement();
+                    if (markerElement) {
+                        markerElement.classList.remove('marker-pulse');
+                        void markerElement.offsetWidth; // Trigger reflow
+                        markerElement.classList.add('marker-pulse');
+                    }
+                }
+            }
+            
+            return;
+        }
+        
+        // We have both locations, calculate the route
+        if (routingControl) {
+            // Remove the existing route
+            map.removeControl(routingControl);
+        }
+        
+        // Create a new routing control
+        routingControl = L.Routing.control({
+            waypoints: [
+                L.latLng(originLocation[0], originLocation[1]),
+                L.latLng(destinationLocation[0], destinationLocation[1])
+            ],
+            routeWhileDragging: true,
+            lineOptions: {
+                styles: [
+                    { color: isDarkMode ? '#64B5F6' : '#4768cb', opacity: 0.8, weight: 5 }
+                ]
+            },
+            createMarker: function() {
+                return null;
+            },
+            addWaypoints: false,
+            draggableWaypoints: false,
+            fitSelectedRoutes: true,
+            showAlternatives: false
+        }).addTo(map);
+        
+        // Add our custom markers
+        if (!originMarker) {
+            originMarker = L.marker(originLocation, {
+                icon: createCustomIcon('marker-origin')
+            }).addTo(map);
+            
+            // Add a popup with information
+            originMarker.bindPopup(`
+                <div class="popup-title">Origin</div>
+                <div class="popup-address">${document.getElementById('origin-display').textContent}</div>
+                <div class="popup-info">Start point</div>
+            `);
+            
+            // Add animation class for dropping effect
+            const markerElement = originMarker.getElement();
+            if (markerElement) {
+                markerElement.classList.add('marker-drop');
+            }
+        } else {
+            originMarker.setLatLng(originLocation);
+            
+            // Apply pulse animation to existing marker
+            const markerElement = originMarker.getElement();
+            if (markerElement) {
+                markerElement.classList.remove('marker-pulse');
+                void markerElement.offsetWidth; // Trigger reflow
+                markerElement.classList.add('marker-pulse');
+            }
+        }
+        
+        if (!destinationMarker) {
+            destinationMarker = L.marker(destinationLocation, {
+                icon: createCustomIcon('marker-destination')
+            }).addTo(map);
+            
+            // Listen for the route calculation to update the popup with distance info
+            routingControl.on('routesfound', function(e) {
+                const routes = e.routes;
+                const summary = routes[0].summary;
+                
+                // Update the popup with route information
+                destinationMarker.bindPopup(`
+                    <div class="popup-title">Destination</div>
+                    <div class="popup-address">${document.getElementById('destination-display').textContent}</div>
+                    <div class="popup-info">
+                        <span class="popup-distance">${(summary.totalDistance / 1000).toFixed(1)} km</span> &middot;
+                        <span class="popup-duration">${Math.round(summary.totalTime / 60)} min</span>
+                    </div>
+                `);
+                
+                // Update directions steps
+                updateDirectionsSteps(routes[0]);
+            });
+            
+            // Add animation class for dropping effect
+            const markerElement = destinationMarker.getElement();
+            if (markerElement) {
+                markerElement.classList.add('marker-drop');
+            }
+        } else {
+            destinationMarker.setLatLng(destinationLocation);
+            
+            // Apply pulse animation to existing marker
+            const markerElement = destinationMarker.getElement();
+            if (markerElement) {
+                markerElement.classList.remove('marker-pulse');
+                void markerElement.offsetWidth; // Trigger reflow
+                markerElement.classList.add('marker-pulse');
+            }
+            
+            // Update popup when route changes
+            routingControl.on('routesfound', function(e) {
+                const routes = e.routes;
+                const summary = routes[0].summary;
+                
+                // Update the popup with new route information
+                destinationMarker.bindPopup(`
+                    <div class="popup-title">Destination</div>
+                    <div class="popup-address">${document.getElementById('destination-display').textContent}</div>
+                    <div class="popup-info">
+                        <span class="popup-distance">${(summary.totalDistance / 1000).toFixed(1)} km</span> &middot;
+                        <span class="popup-duration">${Math.round(summary.totalTime / 60)} min</span>
+                    </div>
+                `);
+                
+                // Update directions steps
+                updateDirectionsSteps(routes[0]);
+            });
+        }
+    } catch (error) {
+        console.error('Error updating map locations:', error);
+    }
+}
+
+function updateDirectionsSteps(route) {
+    if (!route || !route.instructions || route.instructions.length === 0) {
+        return;
+    }
+    
+    const stepsContainer = document.querySelector('.directions-steps');
+    
+    const allSteps = stepsContainer.querySelectorAll('.direction-step');
+    for (let i = 1; i < allSteps.length - 1; i++) {
+        stepsContainer.removeChild(allSteps[i]);
+    }
+    
+    // Update stats
+    const distanceElement = document.querySelector('.stat-value:first-child');
+    const timeElement = document.querySelector('.stat-value:last-child');
+    
+    if (distanceElement) {
+        distanceElement.textContent = route.legs[0].distance.text;
+    }
+    
+    if (timeElement) {
+        timeElement.textContent = route.legs[0].duration.text;
+    }
+    
+    // Get the last step element (destination)
+    const lastStep = stepsContainer.querySelector('.direction-step:last-child');
+    
+    // Add new steps before the last one
+    steps.forEach((step, index) => {
+        const stepElement = document.createElement('div');
+        stepElement.className = 'direction-step';
+        
+        const stepNumber = document.createElement('div');
+        stepNumber.className = 'step-number';
+        stepNumber.textContent = index + 2; // +2 because we already have the first step
+        
+        const stepContent = document.createElement('div');
+        stepContent.className = 'step-content';
+        
+        const stepText = document.createElement('p');
+        stepText.innerHTML = step.instructions;
+        stepText.innerHTML += ` <span class="step-distance">(${step.distance.text})</span>`;
+        
+        stepContent.appendChild(stepText);
+        stepElement.appendChild(stepNumber);
+        stepElement.appendChild(stepContent);
+        
+        // Insert the new step before the last one
+        stepsContainer.insertBefore(stepElement, lastStep);
+    });
+    
+    // Update the last step number
+    const lastStepNumber = lastStep.querySelector('.step-number');
+    if (lastStepNumber) {
+        lastStepNumber.textContent = steps.length + 2;
+    }
+}
+
+window.addEventListener('load', function() {
+    initMap();
+});
+
+// Listen for tab changes to resize the map
+document.addEventListener('DOMContentLoaded', function() {
+    const tabsComponent = document.querySelector('tabs-component');
+    if (tabsComponent) {
+        tabsComponent.addEventListener('tab-changed', function(e) {
+            if (e.detail.title === 'Map View' && map) {
+                // Trigger a resize event to fix any display issues
+                map.invalidateSize();
+                
+                // Recenter the map
+                if (originLocation) {
+                    map.setView(originLocation, 13);
+                }
+            }
+        });
+    }
+});
