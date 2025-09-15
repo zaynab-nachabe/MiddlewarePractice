@@ -8,8 +8,13 @@ let originLocation;
 let destinationLocation;
 let isDarkMode = false; // Track current map theme
 
-// Initialize the map
 function initMap() {
+    // Check if map is already initialized to prevent "Map container is already initialized" error
+    if (map) {
+        console.log('Map is already initialized, skipping initialization');
+        return;
+    }
+    
     try {
         // Get the map container element
         const mapContainer = document.getElementById('map');
@@ -193,8 +198,8 @@ function updateDirectionsSteps(route) {
     }
     
     // Update stats
-    const distanceElement = document.querySelector('.stat-value:first-child');
-    const timeElement = document.querySelector('.stat-value:last-child');
+    const distanceElement = document.querySelector('.distance-stat .stat-value');
+    const timeElement = document.querySelector('.time-stat .stat-value');
     
     if (distanceElement) {
         distanceElement.textContent = (route.summary.totalDistance / 1000).toFixed(1) + ' km';
@@ -233,10 +238,11 @@ function updateDirectionsSteps(route) {
         
         stepText.textContent = cleanText;
         if (instruction.distance > 0) {
-            const distanceSpan = document.createElement('span');
-            distanceSpan.className = 'step-distance';
-            distanceSpan.textContent = ` (${(instruction.distance / 1000).toFixed(1)} km)`;
-            stepText.appendChild(distanceSpan);
+            const distance = (instruction.distance < 1000) 
+                ? `${instruction.distance} m` 
+                : `${(instruction.distance / 1000).toFixed(1)} km`;
+            
+            stepText.innerHTML += ` <span class="step-distance">(${distance})</span>`;
         }
         
         stepContent.appendChild(stepText);
@@ -279,29 +285,41 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function geocodeAddress(address, isOrigin) {
     // Use OpenStreetMap's Nominatim service for geocoding
+    console.log(`Geocoding ${isOrigin ? 'origin' : 'destination'} address:`, address);
+    
     fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Geocoding request failed: ${response.status} ${response.statusText}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data && data.length > 0) {
                 // Get the location from the first result
                 const location = data[0];
                 
+                // Validate the coordinates
+                const lat = parseFloat(location.lat);
+                const lon = parseFloat(location.lon);
+                
+                if (isNaN(lat) || isNaN(lon)) {
+                    console.error('Invalid coordinates from geocoding:', location);
+                    return;
+                }
+                
+                console.log(`Valid coordinates found for ${isOrigin ? 'origin' : 'destination'}:`, lat, lon);
+                
                 if (isOrigin) {
-                    originLocation = [
-                        parseFloat(location.lat),
-                        parseFloat(location.lon)
-                    ];
+                    originLocation = [lat, lon];
                 } else {
-                    destinationLocation = [
-                        parseFloat(location.lat),
-                        parseFloat(location.lon)
-                    ];
+                    destinationLocation = [lat, lon];
                 }
                 
                 // Update the map with the new locations
                 updateMapWithLocations();
             } else {
-                console.error('Geocoding was not successful: No results found');
+                console.error('Geocoding was not successful: No results found for address:', address);
             }
         })
         .catch(error => {
@@ -388,8 +406,15 @@ function updateMapWithLocations() {
             map.removeControl(routingControl);
         }
         
+        // Ensure we have valid waypoints
+        console.log('Creating route with waypoints:', originLocation, destinationLocation);
+        
         // Create a new routing control
         routingControl = L.Routing.control({
+            router: L.Routing.osrmv1({
+                serviceUrl: 'https://router.project-osrm.org/route/v1',
+                profile: 'car'
+            }),
             waypoints: [
                 L.latLng(originLocation[0], originLocation[1]),
                 L.latLng(destinationLocation[0], destinationLocation[1])
@@ -410,7 +435,10 @@ function updateMapWithLocations() {
             showAlternatives: false
         }).addTo(map);
         
-        // Add our custom markers
+        routingControl.on('routingerror', function(e) {
+            console.error('Routing error:', e.error || e);
+        });
+        
         if (!originMarker) {
             originMarker = L.marker(originLocation, {
                 icon: createCustomIcon('marker-origin')
@@ -440,12 +468,19 @@ function updateMapWithLocations() {
             }
         }
         
+        // If no destination marker exists, create one
         if (!destinationMarker) {
             destinationMarker = L.marker(destinationLocation, {
                 icon: createCustomIcon('marker-destination')
             }).addTo(map);
             
-            // Listen for the route calculation to update the popup with distance info
+            // Add a popup with information
+            destinationMarker.bindPopup(`
+                <div class="popup-title">Destination</div>
+                <div class="popup-address">${document.getElementById('destination-display').textContent}</div>
+            `);
+            
+            // Update popup when route changes
             routingControl.on('routesfound', function(e) {
                 const routes = e.routes;
                 const summary = routes[0].summary;
@@ -503,368 +538,3 @@ function updateMapWithLocations() {
         console.error('Error updating map locations:', error);
     }
 }
-
-// Listen for tab changes to resize the map
-document.addEventListener('DOMContentLoaded', function() {
-    const tabsComponent = document.querySelector('tabs-component');
-    if (tabsComponent) {
-        tabsComponent.addEventListener('tab-changed', function(e) {
-            if (e.detail.title === 'Map View' && map) {
-                // Trigger a resize event to fix any display issues
-                map.invalidateSize();
-                
-                // Recenter the map
-                if (originLocation) {
-                    map.setView(originLocation, 13);
-                }
-            }
-        });
-    }
-});
-
-// Function to load saved addresses from localStorage
-function loadSavedAddresses() {
-    try {
-        const savedAddresses = JSON.parse(localStorage.getItem('selectedAddresses'));
-        if (savedAddresses && savedAddresses.departure && savedAddresses.destination) {
-            // We have both addresses, try to geocode them
-            console.log('Loading saved addresses for map:', savedAddresses);
-            
-            // Get the origin address
-            if (savedAddresses.departure.coordinates) {
-                // We already have coordinates
-                originLocation = [
-                    savedAddresses.departure.coordinates[1], // lat
-                    savedAddresses.departure.coordinates[0]  // lng
-                ];
-                updateMapWithLocations();
-            } else {
-                // Need to geocode the address
-                geocodeAddress(savedAddresses.departure.address, true);
-            }
-            
-            // Get the destination address
-            if (savedAddresses.destination.coordinates) {
-                // We already have coordinates
-                destinationLocation = [
-                    savedAddresses.destination.coordinates[1], // lat
-                    savedAddresses.destination.coordinates[0]  // lng
-                ];
-                updateMapWithLocations();
-            } else {
-                // Need to geocode the address
-                geocodeAddress(savedAddresses.destination.address, false);
-            }
-        } else {
-            console.log('No saved addresses found for map');
-        }
-    } catch (error) {
-        console.error('Error loading saved addresses for map:', error);
-    }
-}
-
-function geocodeAddress(address, isOrigin) {
-    // Use OpenStreetMap's Nominatim service for geocoding
-    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`)
-        .then(response => response.json())
-        .then(data => {
-            if (data && data.length > 0) {
-                // Get the location from the first result
-                const location = data[0];
-                
-                if (isOrigin) {
-                    originLocation = [
-                        parseFloat(location.lat),
-                        parseFloat(location.lon)
-                    ];
-                } else {
-                    destinationLocation = [
-                        parseFloat(location.lat),
-                        parseFloat(location.lon)
-                    ];
-                }
-                
-                // Update the map with the new locations
-                updateMapWithLocations();
-            } else {
-                console.error('Geocoding was not successful: No results found');
-            }
-        })
-        .catch(error => {
-            console.error('Error in geocoding:', error);
-        });
-}
-
-function updateMapWithLocations() {
-    try {
-        // Only proceed if we have both locations
-        if (!originLocation || !destinationLocation) {
-            // If we have at least the origin, center the map on it
-            if (originLocation) {
-                map.setView(originLocation, 13);
-                
-                // Create a marker for the origin
-                if (!originMarker) {
-                    originMarker = L.marker(originLocation, {
-                        icon: createCustomIcon('marker-origin')
-                    }).addTo(map);
-                    
-                    // Add a popup with information
-                    originMarker.bindPopup(`
-                        <div class="popup-title">Origin</div>
-                        <div class="popup-address">${document.getElementById('origin-display').textContent}</div>
-                        <div class="popup-info">Start point</div>
-                    `);
-                    
-                    // Add animation class for dropping effect
-                    const markerElement = originMarker.getElement();
-                    if (markerElement) {
-                        markerElement.classList.add('marker-drop');
-                    }
-                } else {
-                    originMarker.setLatLng(originLocation);
-                    
-                    // Apply pulse animation to existing marker
-                    const markerElement = originMarker.getElement();
-                    if (markerElement) {
-                        markerElement.classList.remove('marker-pulse');
-                        void markerElement.offsetWidth; // Trigger reflow
-                        markerElement.classList.add('marker-pulse');
-                    }
-                }
-            }
-            
-            // If we have at least the destination, add a marker
-            if (destinationLocation) {
-                if (!destinationMarker) {
-                    destinationMarker = L.marker(destinationLocation, {
-                        icon: createCustomIcon('marker-destination')
-                    }).addTo(map);
-                    
-                    // Add a popup with information
-                    destinationMarker.bindPopup(`
-                        <div class="popup-title">Destination</div>
-                        <div class="popup-address">${document.getElementById('destination-display').textContent}</div>
-                    `);
-                    
-                    // Add animation class for dropping effect
-                    const markerElement = destinationMarker.getElement();
-                    if (markerElement) {
-                        markerElement.classList.add('marker-drop');
-                    }
-                } else {
-                    destinationMarker.setLatLng(destinationLocation);
-                    
-                    // Apply pulse animation to existing marker
-                    const markerElement = destinationMarker.getElement();
-                    if (markerElement) {
-                        markerElement.classList.remove('marker-pulse');
-                        void markerElement.offsetWidth; // Trigger reflow
-                        markerElement.classList.add('marker-pulse');
-                    }
-                }
-            }
-            
-            return;
-        }
-        
-        // We have both locations, calculate the route
-        if (routingControl) {
-            // Remove the existing route
-            map.removeControl(routingControl);
-        }
-        
-        // Create a new routing control
-        routingControl = L.Routing.control({
-            waypoints: [
-                L.latLng(originLocation[0], originLocation[1]),
-                L.latLng(destinationLocation[0], destinationLocation[1])
-            ],
-            routeWhileDragging: true,
-            lineOptions: {
-                styles: [
-                    { color: isDarkMode ? '#64B5F6' : '#4768cb', opacity: 0.8, weight: 5 }
-                ]
-            },
-            createMarker: function() {
-                return null;
-            },
-            addWaypoints: false,
-            draggableWaypoints: false,
-            fitSelectedRoutes: true,
-            showAlternatives: false
-        }).addTo(map);
-        
-        // Add our custom markers
-        if (!originMarker) {
-            originMarker = L.marker(originLocation, {
-                icon: createCustomIcon('marker-origin')
-            }).addTo(map);
-            
-            // Add a popup with information
-            originMarker.bindPopup(`
-                <div class="popup-title">Origin</div>
-                <div class="popup-address">${document.getElementById('origin-display').textContent}</div>
-                <div class="popup-info">Start point</div>
-            `);
-            
-            // Add animation class for dropping effect
-            const markerElement = originMarker.getElement();
-            if (markerElement) {
-                markerElement.classList.add('marker-drop');
-            }
-        } else {
-            originMarker.setLatLng(originLocation);
-            
-            // Apply pulse animation to existing marker
-            const markerElement = originMarker.getElement();
-            if (markerElement) {
-                markerElement.classList.remove('marker-pulse');
-                void markerElement.offsetWidth; // Trigger reflow
-                markerElement.classList.add('marker-pulse');
-            }
-        }
-        
-        if (!destinationMarker) {
-            destinationMarker = L.marker(destinationLocation, {
-                icon: createCustomIcon('marker-destination')
-            }).addTo(map);
-            
-            // Listen for the route calculation to update the popup with distance info
-            routingControl.on('routesfound', function(e) {
-                const routes = e.routes;
-                const summary = routes[0].summary;
-                
-                // Update the popup with route information
-                destinationMarker.bindPopup(`
-                    <div class="popup-title">Destination</div>
-                    <div class="popup-address">${document.getElementById('destination-display').textContent}</div>
-                    <div class="popup-info">
-                        <span class="popup-distance">${(summary.totalDistance / 1000).toFixed(1)} km</span> &middot;
-                        <span class="popup-duration">${Math.round(summary.totalTime / 60)} min</span>
-                    </div>
-                `);
-                
-                // Update directions steps
-                updateDirectionsSteps(routes[0]);
-            });
-            
-            // Add animation class for dropping effect
-            const markerElement = destinationMarker.getElement();
-            if (markerElement) {
-                markerElement.classList.add('marker-drop');
-            }
-        } else {
-            destinationMarker.setLatLng(destinationLocation);
-            
-            // Apply pulse animation to existing marker
-            const markerElement = destinationMarker.getElement();
-            if (markerElement) {
-                markerElement.classList.remove('marker-pulse');
-                void markerElement.offsetWidth; // Trigger reflow
-                markerElement.classList.add('marker-pulse');
-            }
-            
-            // Update popup when route changes
-            routingControl.on('routesfound', function(e) {
-                const routes = e.routes;
-                const summary = routes[0].summary;
-                
-                // Update the popup with new route information
-                destinationMarker.bindPopup(`
-                    <div class="popup-title">Destination</div>
-                    <div class="popup-address">${document.getElementById('destination-display').textContent}</div>
-                    <div class="popup-info">
-                        <span class="popup-distance">${(summary.totalDistance / 1000).toFixed(1)} km</span> &middot;
-                        <span class="popup-duration">${Math.round(summary.totalTime / 60)} min</span>
-                    </div>
-                `);
-                
-                // Update directions steps
-                updateDirectionsSteps(routes[0]);
-            });
-        }
-    } catch (error) {
-        console.error('Error updating map locations:', error);
-    }
-}
-
-function updateDirectionsSteps(route) {
-    if (!route || !route.instructions || route.instructions.length === 0) {
-        return;
-    }
-    
-    const stepsContainer = document.querySelector('.directions-steps');
-    
-    const allSteps = stepsContainer.querySelectorAll('.direction-step');
-    for (let i = 1; i < allSteps.length - 1; i++) {
-        stepsContainer.removeChild(allSteps[i]);
-    }
-    
-    // Update stats
-    const distanceElement = document.querySelector('.stat-value:first-child');
-    const timeElement = document.querySelector('.stat-value:last-child');
-    
-    if (distanceElement) {
-        distanceElement.textContent = route.legs[0].distance.text;
-    }
-    
-    if (timeElement) {
-        timeElement.textContent = route.legs[0].duration.text;
-    }
-    
-    // Get the last step element (destination)
-    const lastStep = stepsContainer.querySelector('.direction-step:last-child');
-    
-    // Add new steps before the last one
-    steps.forEach((step, index) => {
-        const stepElement = document.createElement('div');
-        stepElement.className = 'direction-step';
-        
-        const stepNumber = document.createElement('div');
-        stepNumber.className = 'step-number';
-        stepNumber.textContent = index + 2; // +2 because we already have the first step
-        
-        const stepContent = document.createElement('div');
-        stepContent.className = 'step-content';
-        
-        const stepText = document.createElement('p');
-        stepText.innerHTML = step.instructions;
-        stepText.innerHTML += ` <span class="step-distance">(${step.distance.text})</span>`;
-        
-        stepContent.appendChild(stepText);
-        stepElement.appendChild(stepNumber);
-        stepElement.appendChild(stepContent);
-        
-        // Insert the new step before the last one
-        stepsContainer.insertBefore(stepElement, lastStep);
-    });
-    
-    // Update the last step number
-    const lastStepNumber = lastStep.querySelector('.step-number');
-    if (lastStepNumber) {
-        lastStepNumber.textContent = steps.length + 2;
-    }
-}
-
-window.addEventListener('load', function() {
-    initMap();
-});
-
-// Listen for tab changes to resize the map
-document.addEventListener('DOMContentLoaded', function() {
-    const tabsComponent = document.querySelector('tabs-component');
-    if (tabsComponent) {
-        tabsComponent.addEventListener('tab-changed', function(e) {
-            if (e.detail.title === 'Map View' && map) {
-                // Trigger a resize event to fix any display issues
-                map.invalidateSize();
-                
-                // Recenter the map
-                if (originLocation) {
-                    map.setView(originLocation, 13);
-                }
-            }
-        });
-    }
-});
