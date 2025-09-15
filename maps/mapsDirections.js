@@ -213,12 +213,9 @@ function updateDirectionsSteps(route) {
             `${minutes} min`;
     }
     
-    // Get the last step element (destination)
     const lastStep = stepsContainer.querySelector('.direction-step:last-child');
     
-    // Add new steps before the last one
     instructions.forEach((instruction, index) => {
-        // Skip the first and last instruction (they're handled by the origin/destination)
         if (index === 0 || index === instructions.length - 1) return;
         
         const stepElement = document.createElement('div');
@@ -226,14 +223,13 @@ function updateDirectionsSteps(route) {
         
         const stepNumber = document.createElement('div');
         stepNumber.className = 'step-number';
-        stepNumber.textContent = index + 1; // +1 because we already have the first step
+        stepNumber.textContent = index + 1;
         
         const stepContent = document.createElement('div');
         stepContent.className = 'step-content';
         
         const stepText = document.createElement('p');
         
-        // Clean up the instruction text (remove HTML tags)
         let cleanText = instruction.text.replace(/<(?:.|\n)*?>/gm, '');
         
         stepText.textContent = cleanText;
@@ -249,32 +245,26 @@ function updateDirectionsSteps(route) {
         stepElement.appendChild(stepNumber);
         stepElement.appendChild(stepContent);
         
-        // Insert the new step before the last one
         stepsContainer.insertBefore(stepElement, lastStep);
     });
     
-    // Update the last step number
     const lastStepNumber = lastStep.querySelector('.step-number');
     if (lastStepNumber) {
         lastStepNumber.textContent = instructions.length;
     }
 }
 
-// Initialize the map when the window loads
 window.addEventListener('load', function() {
     initMap();
 });
 
-// Listen for tab changes to resize the map
 document.addEventListener('DOMContentLoaded', function() {
     const tabsComponent = document.querySelector('tabs-component');
     if (tabsComponent) {
         tabsComponent.addEventListener('tab-changed', function(e) {
             if (e.detail.title === 'Map View' && map) {
-                // Trigger a resize event to fix any display issues
                 map.invalidateSize();
                 
-                // Recenter the map
                 if (originLocation) {
                     map.setView(originLocation, 13);
                 }
@@ -284,7 +274,6 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function geocodeAddress(address, isOrigin) {
-    // Use OpenStreetMap's Nominatim service for geocoding
     console.log(`Geocoding ${isOrigin ? 'origin' : 'destination'} address:`, address);
     
     fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`)
@@ -296,10 +285,8 @@ function geocodeAddress(address, isOrigin) {
         })
         .then(data => {
             if (data && data.length > 0) {
-                // Get the location from the first result
                 const location = data[0];
                 
-                // Validate the coordinates
                 const lat = parseFloat(location.lat);
                 const lon = parseFloat(location.lon);
                 
@@ -316,7 +303,6 @@ function geocodeAddress(address, isOrigin) {
                     destinationLocation = [lat, lon];
                 }
                 
-                // Update the map with the new locations
                 updateMapWithLocations();
             } else {
                 console.error('Geocoding was not successful: No results found for address:', address);
@@ -437,6 +423,59 @@ function updateMapWithLocations() {
         
         routingControl.on('routingerror', function(e) {
             console.error('Routing error:', e.error || e);
+            
+            // Show error notification to the user
+            if (typeof InfoPopup !== 'undefined') {
+                InfoPopup.error(
+                    'Could not calculate a route between these locations. Please try different addresses.',
+                    'Routing Error'
+                );
+            }
+        });
+        
+        routingControl.on('routesfound', function(e) {
+            const routes = e.routes;
+            const summary = routes[0].summary;
+            
+            // Check for significant detours or traffic issues
+            if (summary.totalDistance > 10000) { // Only for routes > 10km
+                // This is where we would integrate with a traffic API
+                // For demo purposes, randomly show traffic notifications
+                if (Math.random() < 0.3 && typeof InfoPopup !== 'undefined') {
+                    const issues = [
+                        {
+                            title: 'Traffic Alert',
+                            message: 'Heavy traffic detected on your route. Consider traveling during off-peak hours.',
+                            type: 'warning'
+                        },
+                        {
+                            title: 'Route Changed',
+                            message: 'Your route has been optimized to avoid congestion ahead.',
+                            type: 'info'
+                        },
+                        {
+                            title: 'Weather Advisory',
+                            message: 'Rain expected along your route. Drive carefully and allow extra time.',
+                            type: 'warning'
+                        }
+                    ];
+                    
+                    const randomIssue = issues[Math.floor(Math.random() * issues.length)];
+                    
+                    InfoPopup.show({
+                        type: randomIssue.type,
+                        title: randomIssue.title,
+                        message: randomIssue.message,
+                        duration: 8000,
+                        action: {
+                            text: 'View Details',
+                            callback: function() {
+                                alert('This would show detailed traffic or weather information');
+                            }
+                        }
+                    });
+                }
+            }
         });
         
         if (!originMarker) {

@@ -45,7 +45,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }, 500);
             }
         } else {
-            // No saved addresses, show default text
             updateOriginDisplays('Please select a departure point');
             updateDestinationDisplays('Please select a destination');
         }
@@ -125,15 +124,10 @@ document.addEventListener('DOMContentLoaded', function() {
             updateOriginDisplays(formData['departure-address']);
             updateDestinationDisplays(formData['destination-address']);
             
-            // If map is initialized, update it by geocoding the addresses
             if (typeof geocodeAddress === 'function') {
                 geocodeAddress(formData['departure-address'], true);
                 geocodeAddress(formData['destination-address'], false);
             }
-            
-            setTimeout(() => {
-                alert('Route updated! Check the Map and Directions tabs for details.');
-            }, 1000);
         });
     }
     
