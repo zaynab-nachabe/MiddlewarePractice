@@ -1,0 +1,19 @@
+[
+  {
+    "Name": "New Profile",
+    "Projects": [
+      {
+        "Path": "RoutingService\\RoutingService.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "Proxy\\Proxy.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "LetsGoBiking\\serverGPS.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

@@ -1,25 +1,22 @@
-// Maps and Directions functionality for the Itineraries page using OpenStreetMap and Leaflet
-
 let map;
 let routingControl;
 let originMarker;
 let destinationMarker;
 let originLocation;
 let destinationLocation;
-let isDarkMode = false; // Track current map theme
+let isDarkMode = false;
 
 function initMap() {
-    // Check if map is already initialized to prevent "Map container is already initialized" error
     if (map) {
         console.log('Map is already initialized, skipping initialization');
         return;
     }
     
     try {
-        // Get the map container element
         const mapContainer = document.getElementById('map');
         
-        // Show loading indicator
+        console.log('Map container found:', mapContainer);
+        
         if (mapContainer) {
             mapContainer.classList.add('loading');
             mapContainer.innerHTML = `
@@ -28,29 +25,45 @@ function initMap() {
                     <p>Loading map...</p>
                 </div>
             `;
+        } else {
+            console.error('Map container element not found');
+            return;
         }
         
-        // Default center on Paris, France
+        // Default
         const defaultCenter = [48.8566, 2.3522];
         
-        // Create Leaflet map
-        map = L.map('map').setView(defaultCenter, 7);
+        console.log('Initializing Leaflet map...');
+        map = L.map('map', {
+            zoomControl: true,
+            attributionControl: true
+        }).setView(defaultCenter, 7);
+        console.log('Map created:', map);
         
-        // Clear the loading indicator
         mapContainer.innerHTML = '';
         mapContainer.classList.remove('loading');
         
-        // Add the default OpenStreetMap tile layer
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        console.log('Adding tile layer...');
+        const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            maxZoom: 19
-        }).addTo(map);
+            maxZoom: 19,
+            subdomains: ['a','b','c']
+        });
+        
+        tileLayer.addTo(map);
+        console.log('Tile layer added:', tileLayer);
         
         // Create the theme toggle control
         createThemeToggleControl();
         
         // Try to get saved addresses from localStorage
         loadSavedAddresses();
+        
+        // Force a resize to ensure the map renders correctly
+        setTimeout(() => {
+            console.log('Forcing map resize...');
+            map.invalidateSize();
+        }, 500);
     } catch (error) {
         console.error('Error initializing map:', error);
         
@@ -255,7 +268,18 @@ function updateDirectionsSteps(route) {
 }
 
 window.addEventListener('load', function() {
-    initMap();
+    console.log('Window load event fired, initializing map...');
+    
+    setTimeout(() => {
+        initMap();
+        
+        setTimeout(() => {
+            if (map) {
+                console.log('Forcing map resize after delay...');
+                map.invalidateSize(true);
+            }
+        }, 1000);
+    }, 100);
 });
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -263,7 +287,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (tabsComponent) {
         tabsComponent.addEventListener('tab-changed', function(e) {
             if (e.detail.title === 'Map View' && map) {
-                map.invalidateSize();
+                console.log('Tab changed to Map View, invalidating map size...');
+                map.invalidateSize(true);
                 
                 if (originLocation) {
                     map.setView(originLocation, 13);

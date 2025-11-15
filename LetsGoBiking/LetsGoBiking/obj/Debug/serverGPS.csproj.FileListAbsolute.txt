@@ -1,0 +1,5 @@
+C:\Users\zayna\OneDrive\Documents\Semester7\middlewareAndServiceOrientedComputing\LetsGoBiking\LetsGoBiking\obj\Debug\serverGPS.csproj.AssemblyReference.cache
+C:\Users\zayna\OneDrive\Documents\Semester7\middlewareAndServiceOrientedComputing\LetsGoBiking\LetsGoBiking\obj\Debug\LetsGoBiking.exe.config
+C:\Users\zayna\OneDrive\Documents\Semester7\middlewareAndServiceOrientedComputing\LetsGoBiking\LetsGoBiking\obj\Debug\serverGPS.csproj.CoreCompileInputs.cache
+C:\Users\zayna\OneDrive\Documents\Semester7\middlewareAndServiceOrientedComputing\LetsGoBiking\LetsGoBiking\obj\Debug\LetsGoBiking.exe
+C:\Users\zayna\OneDrive\Documents\Semester7\middlewareAndServiceOrientedComputing\LetsGoBiking\LetsGoBiking\obj\Debug\LetsGoBiking.pdb
